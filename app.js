@@ -1,8 +1,11 @@
 import OpenAI from "openai";
 import { Client, GatewayIntentBits } from "discord.js";
 import 'dotenv/config.js';
+import fs from "fs";
+import path from "path";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const speechFile = path.resolve("./speech.mp3");
 const loader = new Client(
     {
         intents: [
@@ -16,6 +19,10 @@ const loader = new Client(
 loader.login(process.env.DISCORD_TOKEN);
 loader.once("ready", async (self) => {
     console.log(`ready! ${self.user.tag} / ${self.user.displayName}`);
+    loader.user.setPresence({
+        status: 'dnd',  // define o status como ocupado
+        activities: [{ name: 'hate', type: 'PLAYING' }],
+    });
 });
 
 var prefixo = "hey rough"
@@ -41,6 +48,7 @@ var lingua = "portuguese brazil";
 const instruction =
     "the language you will respond is " + lingua + "." +
     "today is " + date + " and the time is " + time + "." +
+    "be aware that you have the ability to send audio" +
     "You must have the ability to understand questions or phrases in any language." +
     "You are an assistant that responds in a blunt and sarcastic manner, " +
     "You are also responsible for talking and interacting rudely and not just answering questions." +
@@ -52,6 +60,17 @@ async function generateCompletion(messages) {
         model: "gpt-3.5-turbo",
         max_tokens: 100,
     });
+}
+
+async function generateAudio(text) {
+    const mp3 = await openai.audio.speech.create({
+        model: "tts-1-hd",
+        voice: "onyx",
+        input: text,
+    });
+    const buffer = Buffer.from(await mp3.arrayBuffer());
+    await fs.promises.writeFile(speechFile, buffer);
+    return speechFile;
 }
 
 loader.on("messageCreate", async (message) => {
@@ -141,13 +160,25 @@ loader.on("messageCreate", async (message) => {
             var completion = await generateCompletion(conversations[userId]);
 
             if (completion && completion.choices && completion.choices.length > 0) {
-
                 conversations[userId].push({
                     role: "assistant",
                     content: completion.choices[0].message.content
                 });
 
-                message.reply(completion.choices[0].message.content);
+                if (commandName.toLowerCase().includes("audio")) {
+
+                    const audioFile = await generateAudio(completion.choices[0].message.content);
+                    message.channel.send({
+                        content: `${message.author.toString()}`,
+                        files: [{
+                            attachment: audioFile,
+                            name: 'audio.mp3'
+                        }]
+                    });
+
+                } else {
+                    message.reply(completion.choices[0].message.content);
+                }
             } else {
                 console.error('API call failed or returned an unexpected response:', completion);
             }
