@@ -3,7 +3,6 @@ import { Client, GatewayIntentBits } from "discord.js";
 import 'dotenv/config.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 const loader = new Client(
     {
         intents: [
@@ -15,20 +14,18 @@ const loader = new Client(
 );
 
 loader.login(process.env.DISCORD_TOKEN);
-
 loader.once("ready", async (self) => {
     console.log(`ready! ${self.user.tag} / ${self.user.displayName}`);
 });
 
 var prefixo = "hey rough"
 var prefixoEnd = "bye rough"
-var iniciado = false;
+var iniciado = {};
 const limit = 5;
 let conversations = {};
 let timeouts = {};
 let userMessages = {};
-
-
+var activeChannels = new Set();
 let currentDateTime = new Date();
 
 let date = ('0' + currentDateTime.getDate()).slice(-2) + '/'
@@ -38,6 +35,7 @@ let date = ('0' + currentDateTime.getDate()).slice(-2) + '/'
 let time = ('0' + currentDateTime.getHours()).slice(-2) + ":"
     + ('0' + currentDateTime.getMinutes()).slice(-2) + ":"
     + ('0' + currentDateTime.getSeconds()).slice(-2);
+
 
 var lingua = "portuguese brazil";
 const instruction =
@@ -57,20 +55,45 @@ async function generateCompletion(messages) {
 }
 
 loader.on("messageCreate", async (message) => {
+    // Se a mensagem foi enviada por um bot, não faça nada
     if (message.author.bot) return;
 
-    if (message.content.toLowerCase().trim() === prefixo && !iniciado) {
+    // Obtém o ID do canal da mensagem
+    let channelId = message.channel.id;
+
+    // Se o canal ainda não tem um estado 'iniciado', inicializa como false
+    if (!iniciado[channelId]) {
+        iniciado[channelId] = false;
+    }
+
+    // Se a mensagem é o comando para iniciar o bot e o bot ainda não foi iniciado neste canal
+    if (message.content.toLowerCase().trim() === prefixo && !iniciado[channelId]) {
+        // Responda à mensagem com "iniciado"
         message.reply("iniciado");
-        iniciado = true;
+        // Marque o bot como iniciado neste canal
+        iniciado[channelId] = true;
+        // Adicione o canal ao conjunto de canais ativos
+        activeChannels.add(channelId);
         return;
-    } else if (message.content.toLowerCase().trim() === prefixoEnd && iniciado) {
+    }
+    // Se a mensagem é o comando para desligar o bot e o bot está iniciado neste canal
+    else if (message.content.toLowerCase().trim() === prefixoEnd && iniciado[channelId]) {
+        // Responda à mensagem com "desligado"
         message.reply("desligado");
-        iniciado = false;
+        // Marque o bot como não iniciado neste canal
+        iniciado[channelId] = false;
+        // Remova o canal do conjunto de canais ativos
+        activeChannels.delete(channelId);
         return;
     }
 
-    if (iniciado == true) {
+    // Se o bot não está iniciado neste canal, não faça nada
+    if (!iniciado[channelId]) {
+        return;
+    }
 
+
+    if (iniciado[channelId]) {
         const commandName = message.content.trim();
         const userId = message.author.id;
 
@@ -133,10 +156,6 @@ loader.on("messageCreate", async (message) => {
             timeouts[userId] = null;
             userMessages[userId] = "";
         }, 3500);  // 3.5 segundos
-
-        //message.content
-        //message.reply
-        //message.author.displayName
     } else {
         return;
     }
