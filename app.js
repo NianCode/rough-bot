@@ -157,7 +157,13 @@ loader.on("messageCreate", async (message) => {
                 content: userMessages[userId]
             });
 
-            var completion = await generateCompletion(conversations[userId]);
+            var completion = await generateCompletion(conversations[userId]).then((response) => {
+                console.log('gerado')
+                return response.data;
+            }).catch((error) => {
+                console.error('API call failed:', error);
+                return null;
+            });
 
             if (completion && completion.choices && completion.choices.length > 0) {
                 conversations[userId].push({
@@ -186,7 +192,7 @@ loader.on("messageCreate", async (message) => {
             // Limpe o timeout para este usuário.
             timeouts[userId] = null;
             userMessages[userId] = "";
-        }, 3500);  // 3.5 segundos
+        }, 2000);  // 2 segundos
     } else {
         return;
     }
