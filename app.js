@@ -158,7 +158,7 @@ loader.on("messageCreate", async (message) => {
             });
 
             var completion = await generateCompletion(conversations[userId]).then((response) => {
-                console.log('gerado')
+                console.log(completion.choices[0].message.content)
                 return response.data;
             }).catch((error) => {
                 console.error('API call failed:', error);
